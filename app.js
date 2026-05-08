@@ -435,11 +435,32 @@ el.fileInput.addEventListener('change', async e => {
   if (e.target.files.length) { await importFiles(e.target.files); e.target.value = ''; }
 });
 
-// ── URL import (audio directo) ────────────────────────────
+// ── URL import (solo audio directo, NO YouTube) ───────────
+
+const YT_PATTERNS = [
+  /youtu\.be\//i,
+  /youtube\.com\/watch/i,
+  /youtube\.com\/shorts/i,
+  /music\.youtube\.com/i,
+];
+
+function isYouTubeUrl(url) {
+  return YT_PATTERNS.some(p => p.test(url));
+}
 
 el.btnUrl.addEventListener('click', async () => {
   const url = el.urlInput.value.trim();
   if (!url) { setUrlStatus('❌ Ingresa una URL', 'err'); return; }
+
+  // Detectar YouTube y dar instrucciones claras
+  if (isYouTubeUrl(url)) {
+    setUrlStatus(
+      '🚫 YouTube bloquea descargas directas desde el navegador (CORS). ' +
+      'Descarga el MP3 con yt-dlp o una app como NewPipe, luego impórtalo desde "Agregar archivos" ⬆️',
+      'err'
+    );
+    return;
+  }
 
   setUrlStatus('⌛ Descargando...', 'loading');
   try {
@@ -448,7 +469,7 @@ el.btnUrl.addEventListener('click', async () => {
 
     const contentType = res.headers.get('content-type') || 'audio/mpeg';
     if (!contentType.startsWith('audio/') && !contentType.includes('octet-stream'))
-      throw new Error('La URL no apunta a un archivo de audio');
+      throw new Error('La URL no apunta a un archivo de audio directo (.mp3, .ogg, .flac, etc.)');
 
     const buffer   = await res.arrayBuffer();
     const filename = url.split('/').pop().split('?')[0] || 'cancion.mp3';
@@ -466,7 +487,11 @@ el.btnUrl.addEventListener('click', async () => {
     setUrlStatus('✅ Canción agregada', 'ok');
     el.urlInput.value = '';
   } catch(e) {
-    setUrlStatus(`❌ ${e.message}`, 'err');
+    // Dar mensaje más útil si es CORS
+    const msg = e.message.includes('Failed to fetch') || e.message.includes('NetworkError')
+      ? 'No se pudo acceder a la URL. Puede ser CORS (el servidor no permite acceso externo) o la URL no existe.'
+      : e.message;
+    setUrlStatus(`❌ ${msg}`, 'err');
   }
 });
 

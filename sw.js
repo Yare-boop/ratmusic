@@ -118,7 +118,7 @@ function offlineFallback(request) {
   // Para otros recursos, respuesta vacía
   return new Response('', {
     status: 503,
-    statusText: 'Offline — RatMusic sin conexión',
+    statusText: 'Offline',
   });
 }
 
