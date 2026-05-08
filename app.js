@@ -11,11 +11,11 @@ const STORE      = 'songs';
 
 // ── State ─────────────────────────────────────────────────
 let db          = null;
-let songs       = [];          // array of song metadata from DB
+let songs       = [];
 let currentIdx  = -1;
 let isPlaying   = false;
 let isShuffle   = false;
-let repeatMode  = 0;           // 0=off  1=all  2=one
+let repeatMode  = 0;
 let shuffleQueue= [];
 
 // ── Audio ─────────────────────────────────────────────────
@@ -23,7 +23,7 @@ const audio         = new Audio();
 audio.volume        = 0.8;
 let currentObjectUrl= null;
 
-// ── Web Audio API (visualizer) ────────────────────────────
+// ── Web Audio API ─────────────────────────────────────────
 let audioCtx  = null;
 let analyser  = null;
 let sourceNode= null;
@@ -34,31 +34,36 @@ const $  = id  => document.getElementById(id);
 const $$ = sel => document.querySelectorAll(sel);
 
 const el = {
-  npTitle    : $('np-title'),
-  npMeta     : $('np-meta'),
-  timeCur    : $('time-cur'),
-  timeTot    : $('time-tot'),
-  progress   : $('progress'),
-  pbarFill   : $('pbar-fill'),
-  volume     : $('volume'),
-  btnPlay    : $('btn-play'),
-  btnPrev    : $('btn-prev'),
-  btnNext    : $('btn-next'),
-  btnShuffle : $('btn-shuffle'),
-  btnRepeat  : $('btn-repeat'),
-  songList   : $('song-list'),
-  libCount   : $('lib-count'),
-  btnClear   : $('btn-clear'),
-  dropZone   : $('drop-zone'),
-  fileInput  : $('file-input'),
-  importLog  : $('import-log'),
-  ytUrl      : $('yt-url'),
-  ytFormat   : $('yt-format'),
-  ytDl       : $('yt-dl'),
-  ytStatus   : $('yt-status'),
-  visualizer : $('visualizer'),
-  ratIdle    : $('rat-idle'),
+  npTitle       : $('np-title'),
+  npMeta        : $('np-sub'),           // era np-meta
+  timeCur       : $('time-cur'),
+  timeTot       : $('time-dur'),         // era time-tot
+  progressTrack : $('progress-track'),
+  progressFill  : $('progress-fill'),
+  progressThumb : $('progress-thumb'),
+  volTrack      : $('vol-track'),
+  volFill       : $('vol-fill'),
+  volThumb      : $('vol-thumb'),
+  btnPlay       : $('btn-play'),
+  btnPrev       : $('btn-prev'),
+  btnNext       : $('btn-next'),
+  btnShuffle    : $('btn-shuffle'),
+  btnRepeat     : $('btn-repeat'),
+  songList      : $('song-list'),
+  libCount      : $('pill-count'),       // era lib-count
+  btnClear      : $('btn-clear-all'),    // era btn-clear
+  dropZone      : $('drop-zone'),
+  fileInput     : $('file-input'),
+  urlInput      : $('url-input'),        // era yt-url
+  btnUrl        : $('btn-url'),          // era yt-dl
+  urlStatus     : $('url-status'),       // era yt-status
+  storageInfo   : $('storage-info'),
+  ratFact       : $('rat-fact'),
+  searchInput   : $('search-input'),
+  toastContainer: $('toast-container'),
 };
+
+updateVolBar(audio.volume);
 
 // ═══════════════════════════════════════════════════════════
 //  IndexedDB
@@ -127,32 +132,42 @@ function dbClear() {
 async function loadSongs() {
   songs = await dbGetAll();
   renderLibrary();
+  updateStorageInfo();
 }
 
-function renderLibrary() {
-  el.libCount.textContent = `${songs.length} ${songs.length === 1 ? 'canción' : 'canciones'}`;
+let searchQuery = '';
 
-  if (songs.length === 0) {
+function renderLibrary() {
+  const filtered = searchQuery
+    ? songs.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : songs;
+
+  const count = songs.length;
+  el.libCount.textContent = `${count} ${count === 1 ? 'track' : 'tracks'}`;
+
+  if (filtered.length === 0) {
     el.songList.innerHTML = `
-      <li class="empty-state">
-        <div>🐀</div>
-        <div>Biblioteca vacía</div>
-        <div>Importa archivos desde la pestaña 📥</div>
+      <li class="song-empty">
+        <span>🐭</span>
+        <p>${searchQuery ? 'Sin resultados' : 'Biblioteca vacía'}</p>
+        <small>${searchQuery ? 'Prueba otra búsqueda' : 'Agrega canciones desde ➕'}</small>
       </li>`;
     return;
   }
 
-  el.songList.innerHTML = songs.map((s, i) => `
-    <li class="song-item ${i === currentIdx ? 'active' : ''}" data-i="${i}">
-      <span class="snum">${i === currentIdx ? '♪' : i + 1}</span>
+  el.songList.innerHTML = filtered.map((s, i) => {
+    const realIdx = songs.indexOf(s);
+    return `
+    <li class="song-item ${realIdx === currentIdx ? 'active' : ''}" data-i="${realIdx}">
+      <span class="snum">${realIdx === currentIdx ? '♪' : i + 1}</span>
       <div class="sinfo">
         <div class="sname">${escHtml(s.title)}</div>
         <div class="ssize">${fmtBytes(s.size)}</div>
       </div>
       <span class="sdur">${s.duration || '--:--'}</span>
       <button class="sdel" data-id="${s.id}" aria-label="Eliminar">✕</button>
-    </li>
-  `).join('');
+    </li>`;
+  }).join('');
 
   el.songList.querySelectorAll('.song-item').forEach(item => {
     item.addEventListener('click', e => {
@@ -169,6 +184,11 @@ function renderLibrary() {
   });
 }
 
+el.searchInput.addEventListener('input', e => {
+  searchQuery = e.target.value;
+  renderLibrary();
+});
+
 // ═══════════════════════════════════════════════════════════
 //  Player
 // ═══════════════════════════════════════════════════════════
@@ -179,13 +199,11 @@ async function playSong(idx) {
   currentIdx = idx;
   const song = songs[idx];
 
-  // Clean up previous blob URL
   if (currentObjectUrl) {
     URL.revokeObjectURL(currentObjectUrl);
     currentObjectUrl = null;
   }
 
-  // Create blob URL from stored ArrayBuffer
   const blob = new Blob([song.audioData], { type: song.mimeType || 'audio/mpeg' });
   currentObjectUrl = URL.createObjectURL(blob);
 
@@ -196,13 +214,12 @@ async function playSong(idx) {
     await audio.play();
     isPlaying = true;
   } catch(e) {
-    // autoplay blocked — user can press play
     isPlaying = false;
   }
 
   updatePlayBtn();
   updateNowPlaying(song);
-  setupVisualizer();
+  updateMediaSession(song);
   renderLibrary();
 }
 
@@ -213,26 +230,26 @@ function updateNowPlaying(song) {
 }
 
 function updatePlayBtn() {
-  el.btnPlay.textContent = isPlaying ? '⏸' : '▶';
+  const iconPlay  = el.btnPlay.querySelector('.icon-play');
+  const iconPause = el.btnPlay.querySelector('.icon-pause');
+  if (iconPlay && iconPause) {
+    iconPlay.style.display  = isPlaying ? 'none' : '';
+    iconPause.style.display = isPlaying ? ''     : 'none';
+  } else {
+    el.btnPlay.textContent = isPlaying ? '⏸' : '▶';
+  }
 }
 
 function togglePlay() {
   if (songs.length === 0) return;
-
-  if (currentIdx === -1) {
-    playSong(0);
-    return;
-  }
+  if (currentIdx === -1) { playSong(0); return; }
 
   if (isPlaying) {
     audio.pause();
     isPlaying = false;
     cancelAnimationFrame(animFrame);
   } else {
-    audio.play().then(() => {
-      isPlaying = true;
-      if (analyser) kickVisualizer();
-    }).catch(() => {});
+    audio.play().then(() => { isPlaying = true; }).catch(() => {});
   }
   updatePlayBtn();
   el.npTitle.classList.toggle('playing', isPlaying);
@@ -252,19 +269,17 @@ function playPrev() {
 
 function playNext(auto = false) {
   if (!songs.length) return;
-
   if (repeatMode === 2 && auto) { playSong(currentIdx); return; }
 
   let idx;
   if (isShuffle) {
     const pos = shuffleQueue.indexOf(currentIdx);
-    const nxt = (pos + 1) % shuffleQueue.length;
-    idx = shuffleQueue[nxt];
+    idx = shuffleQueue[(pos + 1) % shuffleQueue.length];
   } else {
     const nxt = currentIdx + 1;
     if (nxt >= songs.length) {
       if (repeatMode === 1) idx = 0;
-      else return; // playlist ended
+      else return;
     } else {
       idx = nxt;
     }
@@ -282,9 +297,8 @@ function toggleShuffle() {
 
 function toggleRepeat() {
   repeatMode = (repeatMode + 1) % 3;
-  const icons = { 0:'↻', 1:'↺', 2:'↻¹' };
-  el.btnRepeat.textContent = icons[repeatMode];
   el.btnRepeat.classList.toggle('active', repeatMode > 0);
+  el.btnRepeat.title = ['Sin repetir', 'Repetir todo', 'Repetir una'][repeatMode];
 }
 
 // ── Audio Events ──────────────────────────────────────────
@@ -292,14 +306,12 @@ function toggleRepeat() {
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
   const pct = (audio.currentTime / audio.duration) * 100;
-  el.pbarFill.style.width = `${pct}%`;
-  el.progress.value       = pct;
-  el.timeCur.textContent  = fmtTime(audio.currentTime);
+  updateProgressBar(pct);
+  el.timeCur.textContent = fmtTime(audio.currentTime);
 });
 
 audio.addEventListener('loadedmetadata', () => {
   el.timeTot.textContent = fmtTime(audio.duration);
-  // Persist duration in DB
   if (currentIdx >= 0) {
     const song = songs[currentIdx];
     const dur  = fmtTime(audio.duration);
@@ -315,7 +327,6 @@ audio.addEventListener('ended', () => {
   updatePlayBtn();
   el.npTitle.classList.remove('playing');
   cancelAnimationFrame(animFrame);
-  el.ratIdle.style.opacity = '1';
   playNext(true);
 });
 
@@ -325,75 +336,54 @@ audio.addEventListener('error', () => {
   el.npMeta.textContent = '❌ Error al reproducir';
 });
 
-// Progress seek
-el.progress.addEventListener('input', e => {
-  if (audio.duration)
-    audio.currentTime = (e.target.value / 100) * audio.duration;
-});
+// ── Progress (div custom) ─────────────────────────────────
 
-// Volume
-el.volume.addEventListener('input', e => {
-  audio.volume = parseFloat(e.target.value);
-});
+function updateProgressBar(pct) {
+  if (el.progressFill)  el.progressFill.style.width = `${pct}%`;
+  if (el.progressThumb) el.progressThumb.style.left  = `${pct}%`;
+}
 
-// ═══════════════════════════════════════════════════════════
-//  Visualizer
-// ═══════════════════════════════════════════════════════════
-
-function setupVisualizer() {
-  try {
-    if (!audioCtx) {
-      audioCtx  = new (window.AudioContext || window.webkitAudioContext)();
-      analyser  = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      sourceNode = audioCtx.createMediaElementSource(audio);
-      sourceNode.connect(analyser);
-      analyser.connect(audioCtx.destination);
-    }
-    if (audioCtx.state === 'suspended') audioCtx.resume();
-    el.ratIdle.style.opacity = '0';
-    cancelAnimationFrame(animFrame);
-    kickVisualizer();
-  } catch(e) {
-    // Visualizer unavailable — keep idle animation
+function seekFromEvent(e) {
+  const rect = el.progressTrack.getBoundingClientRect();
+  const x    = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const pct  = Math.max(0, Math.min(1, x / rect.width));
+  if (audio.duration) {
+    audio.currentTime = pct * audio.duration;
+    updateProgressBar(pct * 100);
   }
 }
 
-function kickVisualizer() {
-  const canvas = el.visualizer;
-  const ctx    = canvas.getContext('2d');
+let isDraggingProgress = false;
+el.progressTrack.addEventListener('mousedown',  e => { isDraggingProgress = true;  seekFromEvent(e); });
+el.progressTrack.addEventListener('touchstart', e => { isDraggingProgress = true;  seekFromEvent(e); }, { passive: true });
+document.addEventListener('mousemove',  e => { if (isDraggingProgress) seekFromEvent(e); });
+document.addEventListener('touchmove',  e => { if (isDraggingProgress) seekFromEvent(e); }, { passive: true });
+document.addEventListener('mouseup',   () => { isDraggingProgress = false; });
+document.addEventListener('touchend',  () => { isDraggingProgress = false; });
 
-  // Hi-DPI sizing
-  const dpr = devicePixelRatio || 1;
-  const W   = canvas.parentElement.clientWidth;
-  const H   = 80;
-  canvas.width  = W * dpr;
-  canvas.height = H * dpr;
-  ctx.scale(dpr, dpr);
+// ── Volume (div custom) ───────────────────────────────────
 
-  const bufLen  = analyser.frequencyBinCount;
-  const data    = new Uint8Array(bufLen);
-  const barW    = (W / bufLen) * 2.2;
-
-  function draw() {
-    animFrame = requestAnimationFrame(draw);
-    analyser.getByteFrequencyData(data);
-
-    ctx.clearRect(0, 0, W, H);
-
-    let x = 0;
-    for (let i = 0; i < bufLen; i++) {
-      const v     = data[i] / 255;
-      const barH  = v * H;
-      const hue   = 42 + v * 22;        // warm gold → orange
-      const alpha = 0.5 + v * 0.5;
-      ctx.fillStyle = `hsla(${hue},100%,55%,${alpha})`;
-      ctx.fillRect(x, H - barH, barW - 1, barH);
-      x += barW;
-    }
-  }
-  draw();
+function updateVolBar(vol) {
+  const pct = vol * 100;
+  if (el.volFill)  el.volFill.style.width = `${pct}%`;
+  if (el.volThumb) el.volThumb.style.left  = `${pct}%`;
 }
+
+function volFromEvent(e) {
+  const rect = el.volTrack.getBoundingClientRect();
+  const x    = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+  const vol  = Math.max(0, Math.min(1, x / rect.width));
+  audio.volume = vol;
+  updateVolBar(vol);
+}
+
+let isDraggingVol = false;
+el.volTrack.addEventListener('mousedown',  e => { isDraggingVol = true;  volFromEvent(e); });
+el.volTrack.addEventListener('touchstart', e => { isDraggingVol = true;  volFromEvent(e); }, { passive: true });
+document.addEventListener('mousemove',  e => { if (isDraggingVol) volFromEvent(e); });
+document.addEventListener('touchmove',  e => { if (isDraggingVol) volFromEvent(e); }, { passive: true });
+document.addEventListener('mouseup',   () => { isDraggingVol = false; });
+document.addEventListener('touchend',  () => { isDraggingVol = false; });
 
 // ═══════════════════════════════════════════════════════════
 //  File Import
@@ -401,14 +391,9 @@ function kickVisualizer() {
 
 async function importFiles(files) {
   const audioFiles = Array.from(files).filter(f => f.type.startsWith('audio/'));
+  if (!audioFiles.length) { showToast('❌ Ningún archivo de audio encontrado', 'err'); return; }
 
-  if (!audioFiles.length) {
-    setLog('❌ Ningún archivo de audio encontrado', 'err');
-    return;
-  }
-
-  setLog(`⌛ Importando ${audioFiles.length} archivo(s)...`, 'warn');
-
+  showToast(`⌛ Importando ${audioFiles.length} archivo(s)...`);
   let ok = 0, fail = 0;
 
   for (const file of audioFiles) {
@@ -430,42 +415,67 @@ async function importFiles(files) {
   }
 
   await loadSongs();
-
   const msg = fail
     ? `✅ ${ok} importadas  ❌ ${fail} con error`
     : `✅ ${ok} canción${ok !== 1 ? 'es' : ''} importada${ok !== 1 ? 's' : ''}`;
-  setLog(msg, ok ? 'ok' : 'err');
+  showToast(msg, ok ? 'ok' : 'err');
 }
 
-function setLog(msg, cls = '') {
-  el.importLog.className = `import-log ${cls ? 'log-' + cls : ''}`;
-  el.importLog.textContent = msg;
-}
-
-// ── Drag & Drop ───────────────────────────────────────────
-
-el.dropZone.addEventListener('dragover', e => {
-  e.preventDefault();
-  el.dropZone.classList.add('over');
-});
-el.dropZone.addEventListener('dragleave', () => {
-  el.dropZone.classList.remove('over');
-});
+el.dropZone.addEventListener('dragover', e => { e.preventDefault(); el.dropZone.classList.add('over'); });
+el.dropZone.addEventListener('dragleave', () => el.dropZone.classList.remove('over'));
 el.dropZone.addEventListener('drop', async e => {
   e.preventDefault();
   el.dropZone.classList.remove('over');
   await importFiles(e.dataTransfer.files);
 });
 el.dropZone.addEventListener('click', e => {
-  if (!['LABEL','INPUT'].includes(e.target.tagName))
-    el.fileInput.click();
+  if (!['LABEL','INPUT'].includes(e.target.tagName)) el.fileInput.click();
 });
 el.fileInput.addEventListener('change', async e => {
-  if (e.target.files.length) {
-    await importFiles(e.target.files);
-    e.target.value = '';
+  if (e.target.files.length) { await importFiles(e.target.files); e.target.value = ''; }
+});
+
+// ── URL import (audio directo) ────────────────────────────
+
+el.btnUrl.addEventListener('click', async () => {
+  const url = el.urlInput.value.trim();
+  if (!url) { setUrlStatus('❌ Ingresa una URL', 'err'); return; }
+
+  setUrlStatus('⌛ Descargando...', 'loading');
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const contentType = res.headers.get('content-type') || 'audio/mpeg';
+    if (!contentType.startsWith('audio/') && !contentType.includes('octet-stream'))
+      throw new Error('La URL no apunta a un archivo de audio');
+
+    const buffer   = await res.arrayBuffer();
+    const filename = url.split('/').pop().split('?')[0] || 'cancion.mp3';
+
+    await dbAdd({
+      title    : cleanTitle(filename),
+      mimeType : contentType.split(';')[0],
+      size     : buffer.byteLength,
+      audioData: buffer,
+      duration : null,
+      date     : new Date().toISOString(),
+    });
+
+    await loadSongs();
+    setUrlStatus('✅ Canción agregada', 'ok');
+    el.urlInput.value = '';
+  } catch(e) {
+    setUrlStatus(`❌ ${e.message}`, 'err');
   }
 });
+
+el.urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') el.btnUrl.click(); });
+
+function setUrlStatus(msg, cls = '') {
+  el.urlStatus.textContent = msg;
+  el.urlStatus.className   = `status-msg ${cls}`;
+}
 
 // ═══════════════════════════════════════════════════════════
 //  Remove Songs
@@ -475,18 +485,15 @@ async function removeSong(id) {
   const idx = songs.findIndex(s => s.id === id);
 
   if (idx === currentIdx) {
-    audio.pause();
-    audio.src = '';
-    isPlaying = false;
-    currentIdx = -1;
+    audio.pause(); audio.src = '';
+    isPlaying = false; currentIdx = -1;
     cancelAnimationFrame(animFrame);
-    el.ratIdle.style.opacity = '1';
-    el.npTitle.textContent = '— sin canción —';
+    el.npTitle.textContent = 'Ninguna canción';
     el.npTitle.classList.remove('playing');
-    el.npMeta.textContent  = '🐀 elige algo de la biblioteca';
+    el.npMeta.textContent  = 'Carga un archivo para empezar';
     el.timeCur.textContent = '0:00';
     el.timeTot.textContent = '0:00';
-    el.pbarFill.style.width = '0%';
+    updateProgressBar(0);
     updatePlayBtn();
   } else if (idx < currentIdx) {
     currentIdx--;
@@ -498,83 +505,34 @@ async function removeSong(id) {
 
 el.btnClear.addEventListener('click', async () => {
   if (!songs.length) return;
-  if (!confirm(`¿Eliminar las ${songs.length} canciones de la biblioteca?\n(Los archivos originales no se borran)`)) return;
+  if (!confirm(`¿Eliminar las ${songs.length} canciones?\n(Los archivos originales no se borran)`)) return;
   audio.pause(); audio.src = '';
   isPlaying = false; currentIdx = -1;
   cancelAnimationFrame(animFrame);
-  el.ratIdle.style.opacity = '1';
-  el.npTitle.textContent = '— sin canción —';
+  el.npTitle.textContent = 'Ninguna canción';
   el.npTitle.classList.remove('playing');
-  el.pbarFill.style.width = '0%';
+  updateProgressBar(0);
   updatePlayBtn();
   await dbClear();
   await loadSongs();
 });
 
 // ═══════════════════════════════════════════════════════════
-//  YouTube Download (via Termux server)
+//  Tabs
 // ═══════════════════════════════════════════════════════════
 
-el.ytDl.addEventListener('click', async () => {
-  const url = el.ytUrl.value.trim();
-  const fmt = el.ytFormat.value;
-
-  if (!url) { setYt('❌ Ingresa una URL de YouTube', 'err'); return; }
-
-  setYt('🐀 Conectando con servidor Termux en localhost:5000...', 'loading');
-
-  try {
-    const controller = new AbortController();
-    const tid = setTimeout(() => controller.abort(), 300_000); // 5 min
-
-    const res = await fetch(
-      `http://127.0.0.1:5000/download?url=${encodeURIComponent(url)}&format=${encodeURIComponent(fmt)}`,
-      { signal: controller.signal }
-    );
-    clearTimeout(tid);
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-      throw new Error(err.error || `HTTP ${res.status}`);
-    }
-
-    const data = await res.json();
-    if (data.status === 'ok') {
-      setYt(`✅ Descargado: "${data.title}"\nAhora impórtalo desde la pestaña 📥`, 'ok');
-    } else {
-      throw new Error(data.error || 'Error desconocido');
-    }
-  } catch(e) {
-    if (e.name === 'AbortError') {
-      setYt('⏱️ Timeout — la descarga tardó demasiado', 'err');
-    } else if (e.name === 'TypeError') {
-      setYt('❌ No se encontró el servidor Termux.\n¿Está corriendo ratmusic-server.py?', 'err');
-    } else {
-      setYt(`❌ ${e.message}`, 'err');
-    }
-  }
-});
-
-function setYt(msg, cls = '') {
-  el.ytStatus.textContent = msg;
-  el.ytStatus.className   = `yt-status ${cls}`;
-}
-
-// ═══════════════════════════════════════════════════════════
-//  Tab Navigation
-// ═══════════════════════════════════════════════════════════
-
-$$('.tab-btn').forEach(btn => {
+$$('.tab').forEach(btn => {
   btn.addEventListener('click', () => {
-    $$('.tab-btn').forEach(b => b.classList.remove('active'));
-    $$('.tab').forEach(t => t.classList.add('hidden'));
-    btn.classList.add('active');
-    $(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+    $$('.tab').forEach(b => b.classList.remove('tab--active'));
+    $$('.panel').forEach(p => p.classList.remove('panel--active'));
+    btn.classList.add('tab--active');
+    const panel = $(`panel-${btn.dataset.tab}`);
+    if (panel) panel.classList.add('panel--active');
   });
 });
 
 // ═══════════════════════════════════════════════════════════
-//  Controls Binding
+//  Controls
 // ═══════════════════════════════════════════════════════════
 
 el.btnPlay.addEventListener('click', togglePlay);
@@ -583,20 +541,18 @@ el.btnNext.addEventListener('click', () => playNext(false));
 el.btnShuffle.addEventListener('click', toggleShuffle);
 el.btnRepeat.addEventListener('click', toggleRepeat);
 
-// ── Keyboard shortcuts ────────────────────────────────────
 document.addEventListener('keydown', e => {
   const tag = e.target.tagName;
   if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
   switch(e.key) {
-    case ' ':          e.preventDefault(); togglePlay(); break;
-    case 'ArrowLeft':  playPrev();          break;
-    case 'ArrowRight': playNext(false);     break;
-    case 's':          toggleShuffle();     break;
-    case 'r':          toggleRepeat();      break;
+    case ' ':          e.preventDefault(); togglePlay();  break;
+    case 'ArrowLeft':  playPrev();                        break;
+    case 'ArrowRight': playNext(false);                   break;
+    case 's':          toggleShuffle();                   break;
+    case 'r':          toggleRepeat();                    break;
   }
 });
 
-// ── Media Session API (lock screen controls) ──────────────
 function updateMediaSession(song) {
   if (!('mediaSession' in navigator)) return;
   navigator.mediaSession.metadata = new MediaMetadata({
@@ -604,22 +560,60 @@ function updateMediaSession(song) {
     artist: 'RatMusic 🐀',
     album : 'Colección Rata',
   });
-  navigator.mediaSession.setActionHandler('play',         togglePlay);
-  navigator.mediaSession.setActionHandler('pause',        togglePlay);
+  navigator.mediaSession.setActionHandler('play',          togglePlay);
+  navigator.mediaSession.setActionHandler('pause',         togglePlay);
   navigator.mediaSession.setActionHandler('previoustrack', playPrev);
-  navigator.mediaSession.setActionHandler('nexttrack',    () => playNext(false));
-}
-
-// Call when song starts
-const origPlaySong = playSong;
-// Patch to also update media session
-async function playSong(idx) {
-  await origPlaySong(idx);
-  if (songs[idx]) updateMediaSession(songs[idx]);
+  navigator.mediaSession.setActionHandler('nexttrack',     () => playNext(false));
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Utility Functions
+//  Storage Info
+// ═══════════════════════════════════════════════════════════
+
+async function updateStorageInfo() {
+  if (!el.storageInfo) return;
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const { usage, quota } = await navigator.storage.estimate();
+      el.storageInfo.textContent = `${fmtBytes(usage)} usados de ${fmtBytes(quota)} disponibles`;
+    } else {
+      el.storageInfo.textContent = 'No disponible en este navegador';
+    }
+  } catch(e) {
+    el.storageInfo.textContent = 'No disponible';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Toast notifications
+// ═══════════════════════════════════════════════════════════
+
+function showToast(msg, type = '') {
+  if (!el.toastContainer) { console.log(msg); return; }
+  const toast = document.createElement('div');
+  toast.className = `toast${type ? ' toast--' + type : ''}`;
+  toast.textContent = msg;
+  Object.assign(toast.style, {
+    background: type === 'err' ? '#f87171' : type === 'ok' ? '#4ade80' : '#ffd700',
+    color: '#111',
+    padding: '10px 16px',
+    borderRadius: '8px',
+    marginTop: '8px',
+    fontFamily: 'monospace',
+    fontSize: '14px',
+    opacity: '0',
+    transition: 'opacity .3s',
+  });
+  el.toastContainer.appendChild(toast);
+  setTimeout(() => (toast.style.opacity = '1'), 10);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    setTimeout(() => toast.remove(), 400);
+  }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Utility
 // ═══════════════════════════════════════════════════════════
 
 function fmtTime(s) {
@@ -637,20 +631,28 @@ function fmtBytes(b) {
 
 function cleanTitle(filename) {
   return filename
-    .replace(/\.[^.]+$/, '')           // remove extension
-    .replace(/[_-]+/g, ' ')            // underscores/dashes → spaces
-    .replace(/\s{2,}/g, ' ')           // collapse spaces
+    .replace(/\.[^.]+$/, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
 function escHtml(s) {
-  return s.replace(/[&<>"']/g, c => ({
-    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
-  }[c]));
+  return s.replace(/[&<>"']/g, c => (
+    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]
+  ));
+}
+
+// ── Fix meta deprecated ───────────────────────────────────
+if (!document.querySelector('meta[name="mobile-web-app-capable"]')) {
+  const m = document.createElement('meta');
+  m.name = 'mobile-web-app-capable';
+  m.content = 'yes';
+  document.head.appendChild(m);
 }
 
 // ═══════════════════════════════════════════════════════════
-//  Service Worker Registration
+//  Service Worker
 // ═══════════════════════════════════════════════════════════
 
 if ('serviceWorker' in navigator) {
@@ -658,13 +660,11 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js')
       .then(reg => {
         console.log('🐀 SW registrado, scope:', reg.scope);
-        // Check for updates
         reg.addEventListener('updatefound', () => {
-          const newWorker = reg.installing;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              console.log('🐀 Nueva versión disponible');
-            }
+          const nw = reg.installing;
+          nw.addEventListener('statechange', () => {
+            if (nw.state === 'installed' && navigator.serviceWorker.controller)
+              showToast('🐀 Nueva versión disponible. Recarga para actualizar.');
           });
         });
       })
