@@ -1,0 +1,45 @@
+{
+  "name": "RatMusic 🐀",
+  "short_name": "RatMusic",
+  "description": "El reproductor de las ratas — música offline 🧀",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0d0d0f",
+  "theme_color": "#0d0d0f",
+  "lang": "es",
+  "categories": ["music", "entertainment"],
+  "icons": [
+    {
+      "src": "rat-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "rat-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "rat-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Importar música",
+      "short_name": "Importar",
+      "description": "Ir directamente a importar archivos",
+      "url": "./index.html#import",
+      "icons": [{ "src": "rat-icon.svg", "sizes": "any" }]
+    }
+  ],
+  "prefer_related_applications": false,
+  "display_override": ["standalone", "minimal-ui"]
+}

@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Background circle -->
+  <rect width="512" height="512" rx="100" fill="#0d0d0f"/>
+
+  <!-- Outer glow ring -->
+  <circle cx="256" cy="256" r="220" fill="none" stroke="#ffd700" stroke-width="6" stroke-opacity="0.25"/>
+
+  <!-- Rat body -->
+  <ellipse cx="256" cy="300" rx="110" ry="90" fill="#3a3a3a"/>
+
+  <!-- Rat head -->
+  <circle cx="256" cy="195" r="72" fill="#3a3a3a"/>
+
+  <!-- Left ear (outer) -->
+  <ellipse cx="194" cy="142" rx="34" ry="40" fill="#3a3a3a"/>
+  <!-- Left ear (inner) -->
+  <ellipse cx="194" cy="142" rx="22" ry="28" fill="#6b2d2d"/>
+
+  <!-- Right ear (outer) -->
+  <ellipse cx="318" cy="142" rx="34" ry="40" fill="#3a3a3a"/>
+  <!-- Right ear (inner) -->
+  <ellipse cx="318" cy="142" rx="22" ry="28" fill="#6b2d2d"/>
+
+  <!-- Eyes -->
+  <circle cx="228" cy="185" r="11" fill="#ffd700"/>
+  <circle cx="284" cy="185" r="11" fill="#ffd700"/>
+  <circle cx="230" cy="183" r="5"  fill="#0d0d0f"/>
+  <circle cx="286" cy="183" r="5"  fill="#0d0d0f"/>
+  <!-- Eye shine -->
+  <circle cx="233" cy="180" r="2"  fill="white" opacity="0.8"/>
+  <circle cx="289" cy="180" r="2"  fill="white" opacity="0.8"/>
+
+  <!-- Nose -->
+  <ellipse cx="256" cy="212" rx="10" ry="7" fill="#c0607a"/>
+
+  <!-- Whiskers left -->
+  <line x1="245" y1="213" x2="190" y2="205" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="245" y1="216" x2="188" y2="220" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="245" y1="211" x2="192" y2="198" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Whiskers right -->
+  <line x1="267" y1="213" x2="322" y2="205" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="267" y1="216" x2="324" y2="220" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="267" y1="211" x2="320" y2="198" stroke="#888" stroke-width="2.5" stroke-linecap="round"/>
+
+  <!-- Tail -->
+  <path d="M 340 340 Q 420 360 430 310 Q 440 260 480 280"
+        fill="none" stroke="#5a5a5a" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Music note left -->
+  <text x="128" y="330" font-size="48" fill="#ffd700" opacity="0.9" font-family="serif">♪</text>
+  <!-- Music note right -->
+  <text x="340" y="318" font-size="36" fill="#ffa500" opacity="0.7" font-family="serif">♫</text>
+
+  <!-- Headphones arc -->
+  <path d="M 200 178 Q 256 130 312 178"
+        fill="none" stroke="#ffd700" stroke-width="9" stroke-linecap="round"/>
+  <!-- Headphone cups -->
+  <rect x="186" y="172" width="22" height="30" rx="8" fill="#ffd700"/>
+  <rect x="304" y="172" width="22" height="30" rx="8" fill="#ffd700"/>
+</svg>

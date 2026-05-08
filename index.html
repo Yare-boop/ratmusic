@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#1a1008" />
+  <meta name="description" content="RatMusic - El reproductor de las ratas" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="RatMusic" />
+  <title>🐀 RatMusic</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne+Mono&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="grain"></div>
+  <div class="deco-rat deco-rat--tl">🐀</div>
+  <div class="deco-rat deco-rat--br">🧀</div>
+
+  <div class="app">
+
+    <header class="header">
+      <div class="header__logo">
+        <span class="logo-icon">🐀</span>
+        <span class="logo-text">RatMusic</span>
+      </div>
+      <div class="header__pills">
+        <span class="pill" id="pill-mode">OFFLINE</span>
+        <span class="pill pill--cheese" id="pill-count">0 tracks</span>
+      </div>
+    </header>
+
+    <section class="now-playing">
+      <div class="np__art">
+        <div class="np__art-inner" id="np-art">
+          <span class="np__emoji">🎵</span>
+        </div>
+        <div class="np__vinyl" id="np-vinyl"></div>
+      </div>
+      <div class="np__info">
+        <p class="np__label">REPRODUCIENDO</p>
+        <h2 class="np__title" id="np-title">Ninguna canción</h2>
+        <p class="np__sub" id="np-sub">Carga un archivo para empezar</p>
+      </div>
+    </section>
+
+    <div class="progress-wrap">
+      <span class="time" id="time-cur">0:00</span>
+      <div class="progress-track" id="progress-track">
+        <div class="progress-fill" id="progress-fill"></div>
+        <div class="progress-thumb" id="progress-thumb"></div>
+      </div>
+      <span class="time" id="time-dur">0:00</span>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl-btn ctrl-btn--sm" id="btn-shuffle" title="Shuffle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line></svg>
+      </button>
+      <button class="ctrl-btn" id="btn-prev" title="Anterior">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+      </button>
+      <button class="ctrl-btn ctrl-btn--play" id="btn-play">
+        <svg class="icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+        <svg class="icon-pause" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+      </button>
+      <button class="ctrl-btn" id="btn-next" title="Siguiente">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6h2v12h-2z"/></svg>
+      </button>
+      <button class="ctrl-btn ctrl-btn--sm" id="btn-repeat" title="Repetir">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+      </button>
+    </div>
+
+    <div class="volume-row">
+      <svg class="vol-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M7 9v6h4l5 5V4l-5 5H7z"/></svg>
+      <div class="volume-track" id="vol-track">
+        <div class="volume-fill" id="vol-fill"></div>
+        <div class="volume-thumb" id="vol-thumb"></div>
+      </div>
+      <svg class="vol-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+    </div>
+
+    <div class="tabs">
+      <button class="tab tab--active" data-tab="library">📀 Biblioteca</button>
+      <button class="tab" data-tab="add">➕ Agregar</button>
+      <button class="tab" data-tab="info">🐀 Info</button>
+    </div>
+
+    <div class="panel panel--active" id="panel-library">
+      <div class="library-toolbar">
+        <input type="search" class="search-input" id="search-input" placeholder="Buscar..." />
+        <button class="icon-btn" id="btn-clear-all" title="Limpiar todo">🗑️</button>
+      </div>
+      <ul class="song-list" id="song-list">
+        <li class="song-empty">
+          <span>🐭</span>
+          <p>Biblioteca vacía</p>
+          <small>Agrega canciones desde ➕</small>
+        </li>
+      </ul>
+    </div>
+
+    <div class="panel" id="panel-add">
+      <div class="add-section">
+        <div class="add-card" id="drop-zone">
+          <div class="add-card__icon">🎵</div>
+          <p class="add-card__title">Arrastra archivos aquí</p>
+          <p class="add-card__sub">MP3 · M4A · OGG · WAV · FLAC · OPUS</p>
+          <label class="btn-primary" for="file-input">Elegir archivos</label>
+          <input type="file" id="file-input" accept="audio/*" multiple style="display:none" />
+        </div>
+        <div class="divider"><span>o pega una URL de audio directo</span></div>
+        <div class="url-card">
+          <div class="url-row">
+            <input type="url" class="url-input" id="url-input" placeholder="https://ejemplo.com/cancion.mp3" />
+            <button class="btn-primary btn-primary--sm" id="btn-url">Agregar</button>
+          </div>
+          <div class="status-msg" id="url-status"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-info">
+      <div class="info-scroll">
+        <div class="info-block">
+          <h3>🐀 ¿Qué es RatMusic?</h3>
+          <p>Reproductor offline 100% en tu navegador. Tus archivos nunca salen de tu dispositivo — todo vive en IndexedDB.</p>
+        </div>
+        <div class="info-block">
+          <h3>📲 Instalar como app</h3>
+          <ol>
+            <li>Abre en <strong>Chrome</strong> para Android</li>
+            <li>Menú <strong>⋮ → "Añadir a pantalla de inicio"</strong></li>
+            <li>¡Listo! Se instala como app nativa</li>
+          </ol>
+        </div>
+        <div class="info-block">
+          <h3>🧀 ¿Y YouTube?</h3>
+          <ul>
+            <li><strong>Termux + yt-dlp</strong> → descarga el MP3 → ábrelo aquí</li>
+            <li><strong>NewPipe / SongTube</strong> → descarga y luego importa</li>
+            <li>URL directa de archivo .mp3 público</li>
+          </ul>
+        </div>
+        <div class="info-block">
+          <h3>💾 Almacenamiento usado</h3>
+          <div class="storage-info" id="storage-info">Calculando...</div>
+        </div>
+        <div class="rat-fact-box">
+          <span class="rat-fact-icon">🐀</span>
+          <p id="rat-fact">Las ratas pueden distinguir ritmos y prefieren el jazz al ruido blanco en experimentos.</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toast-container" id="toast-container"></div>
+  <script src="app.js"></script>
+</body>
+</html>
